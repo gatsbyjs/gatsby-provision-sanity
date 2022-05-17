@@ -1,0 +1,19 @@
+{
+  "name": "gatsby-provision-sanity",
+  "version": "0.0.1",
+  "description": "Package for provisioning Sanity data associated with a Gatsby site",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "gatsby",
+    "sanity"
+  ],
+  "author": "alex.reed@gatsbyjs.com",
+  "license": "ISC",
+  "devDependencies": {
+    "configstore": "^6.0.0",
+    "yargs-parser": "^21.0.1"
+  }
+}
