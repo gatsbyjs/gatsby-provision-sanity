@@ -13,7 +13,7 @@ const args = yargs(hideBin(process.argv)).argv;
 
 require("dotenv").config();
 
-const API_VERSION = new Date().toISOString().split("T")[0];
+const API_VERSION = "2022-05-26";
 const env = process.env.NODE_ENV;
 const isCloud = process.env.GATSBY_CLOUD === "true";
 
@@ -114,7 +114,7 @@ const createProject = async (opts = {}) => {
 
   // if we are given a content path, use it to import documents
   if (sanityContentPath) {
-    await importSanityData(sanityContentPath, datasetName);
+    await importSanityData(sanityStudioPath, sanityContentPath, datasetName);
   }
 
   console.log("Sanity project successfully created");
@@ -151,17 +151,26 @@ const deployGraphQL = async (dirname) => {
   }
 };
 
-const importSanityData = async (sanityContentPath, datasetName) => {
+const importSanityData = async (dirname, sanityContentPath, datasetName) => {
   console.log("Importing Sanity documents...");
 
+  const studioDirname = path.resolve(dirname);
   try {
-    const proc = await execa("npx", [
-      "@sanity/cli",
-      "dataset",
-      "import",
-      `${sanityContentPath}`,
-      `${datasetName}`,
-    ]);
+    const proc = await execa(
+      "sanity",
+      [
+        "dataset",
+        "import",
+        path.resolve(process.cwd(), sanityContentPath),
+        `${datasetName}`,
+      ],
+      {
+        cwd: studioDirname,
+        env: {
+          SANITY_AUTH_TOKEN: "", // re-map env var name
+        },
+      }
+    );
     console.log(proc.stdout);
   } catch (e) {
     console.log(`Failed to import Sanity documents: ${e}`);
