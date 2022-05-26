@@ -2,9 +2,9 @@
 
 This package is to be used for provisioning Sanity data models and content associated with a Gatsby site.
 
-When included as a dependency, it can be used in two contexts — within Gatsby Cloud and locally. Convention dictates that it be used in conjunction with the npm script named `gatsby-provision`. It also requires the path to the Sanity studio config JSON file as an argument. For example:
+When included as a dependency, it can be used in two contexts — within Gatsby Cloud and locally. Convention dictates that it be used in conjunction with the npm script named `gatsby-provision`. It also requires the path to the Sanity studio directory and the path to the compressed content file. For example:
 
-`"gatsby-provision": "gatsby-provision-sanity --sanity-config-path='./studio/sanity.json'"`
+`"gatsby-provision": "gatsby-provision-sanity --sanity-config-path='./studio' --sanity-content-path='./scripts/content.tar.gz'"`
 
 ## Cloud usage
 
@@ -14,4 +14,4 @@ In order to use this script in Gatsby Cloud, all environment variables must be p
 
 ## Local usage
 
-When running this locally, you will be prompted for environment variables if they are not found on the current process. Additionally, after provisioning your Sanity studio, the script will generate a `.env.development` and an `.env.production` file populated with the provided variables for you.
+When running this locally, you will be prompted for environment variables if they are not found on the current process. Additionally, the script will update an `.env` file with the environment variables provided if one exists in the project already.
