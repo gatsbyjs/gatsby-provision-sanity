@@ -46,6 +46,7 @@ const createProject = async (opts = {}) => {
   const sanityStudioPath = args.sanityStudioPath;
   const sanityContentPath = args.sanityContentPath;
   const sanityProjectId = args.sanityProjectId;
+  const sanityProjectName = args.name;
   const sanityDataset = args.dataset;
   let config, client;
 
@@ -78,12 +79,17 @@ const createProject = async (opts = {}) => {
 
   let projectId =
     process.env.SANITY_PROJECT_ID || sanityProjectId || config.api?.projectId;
+  let displayName = sanityProjectName || config.project?.name;
   let datasetName =
     process.env.SANITY_DATASET || sanityDataset || config.api?.dataset; // TODO: could be SANITY_PROJECT_DATASET
   const envVars = [];
 
   if (projectId !== config.api?.projectId) {
     config.api.projectId = projectId;
+  }
+
+  if (displayName !== config.project?.name) {
+    config.project.name = displayName;
   }
 
   if (datasetName !== config.api?.dataset) {
@@ -132,7 +138,7 @@ const deployGraphQL = async (dirname) => {
   // deploy sanity studio
   console.log("Deploying Sanity GraphQL API...");
   try {
-    const proc = await execa("sanity", ["deploy"], {
+    const proc = await execa("sanity", ["graphql", "deploy"], {
       cwd: studioDirname,
       env: {
         SANITY_AUTH_TOKEN: process.env.SANITY_TOKEN, // re-map env var name
