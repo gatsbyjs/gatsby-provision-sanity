@@ -13,7 +13,6 @@
   "author": "alex.reed@gatsbyjs.com",
   "license": "ISC",
   "dependencies": {
-    "@sanity/client": "^3.3.0",
     "configstore": "^6.0.0",
     "dotenv": "^16.0.1",
     "execa": "5.1.1",
