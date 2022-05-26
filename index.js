@@ -2,8 +2,6 @@
 
 const fs = require("fs-extra");
 const path = require("path");
-
-const sanityClient = require("@sanity/client");
 const execa = require("execa");
 
 const yargs = require("yargs/yargs");
@@ -13,42 +11,32 @@ const args = yargs(hideBin(process.argv)).argv;
 
 require("dotenv").config();
 
-const API_VERSION = "2022-05-26";
 const env = process.env.NODE_ENV;
 const isCloud = process.env.GATSBY_CLOUD === "true";
 
 yargs(hideBin(process.argv)).check((_, opts) => {
   const sanityStudioPath = opts.sanityStudioPath;
-  const sanityProjectId = opts.sanityProjectId;
-  const sanityDataset = opts.dataset;
-  // const sanityContentPath = opts.sanityContentPath;
-  if (sanityStudioPath && sanityProjectId && sanityDataset) return true;
+  const sanityContentPath = opts.sanityContentPath;
+  if (sanityStudioPath && sanityContentPath) return true;
   if (!sanityStudioPath) {
     throw new Error(
       "--sanity-studio-path is required — this should be path to the Sanity Studio directory"
     );
   }
-  if (!sanityProjectId) {
-    throw new Error("--sanity-project-id is required");
+  if (!sanityContentPath) {
+    throw new Error(
+      "--sanity-content-path is required — this should be the path to the compressed content file"
+    );
   }
-  if (!sanityDataset) {
-    throw new Error("--sanity-dataset is required");
-  }
-  // if (!sanityContentPath) {
-  //   throw new Error(
-  //     "--sanity-content-path is required — this should be the path to the compressed content file"
-  //   );
-  // }
 });
 
 const createProject = async (opts = {}) => {
-  const token = process.env.SANITY_TOKEN;
   const sanityStudioPath = args.sanityStudioPath;
   const sanityContentPath = args.sanityContentPath;
-  const sanityProjectId = args.sanityProjectId;
+  const sanityProjectId = args.projectId;
   const sanityProjectName = args.name;
   const sanityDataset = args.dataset;
-  let config, client;
+  let config;
 
   try {
     config = require(path.resolve(
@@ -62,18 +50,6 @@ const createProject = async (opts = {}) => {
   }
 
   config.api = config.api || {};
-
-  try {
-    client = sanityClient({
-      apiVersion: API_VERSION,
-      token,
-      useProjectHostname: false,
-      useCdn: false,
-    });
-  } catch (e) {
-    console.log(`Failed to create Sanity API client ${e}`);
-    process.exit(1);
-  }
 
   console.log("Creating new Sanity project");
 
@@ -98,7 +74,7 @@ const createProject = async (opts = {}) => {
 
   // Update the sanity.json file config as other things read from it later
   console.log("Updating sanity.json");
-  fs.outputJson(path.join(`${sanityStudioPath}`, "sanity.json"), config, {
+  fs.outputJson(path.resolve(`${sanityStudioPath}`, "sanity.json"), config, {
     spaces: 2,
   });
 
@@ -110,19 +86,18 @@ const createProject = async (opts = {}) => {
     }
   }
 
-  await deployGraphQL(sanityStudioPath);
+  const studioDirname = path.resolve(sanityStudioPath);
+  // install deps
+  await installStudioDependencies(studioDirname);
+  // deploy graphql API
+  await deployGraphQL(studioDirname);
+  // import sanity data
+  await importSanityData(studioDirname, sanityContentPath, datasetName);
 
-  // if we are given a content path, use it to import documents
-  if (sanityContentPath) {
-    await importSanityData(sanityStudioPath, sanityContentPath, datasetName);
-  }
-
-  console.log("Sanity project successfully created");
+  console.log("Sanity project successfully provisioned and deployed");
 };
 
-const deployGraphQL = async (dirname) => {
-  console.log("Preparing to deploy Sanity GraphQL API...");
-  const studioDirname = path.resolve(dirname);
+const installStudioDependencies = async (studioDirname) => {
   // install needed Sanity Studio dependencies
   console.log("Installing Sanity Studio dependencies...");
   try {
@@ -134,14 +109,16 @@ const deployGraphQL = async (dirname) => {
     console.log(`Failed to install studio dependencies: ${e}`);
     process.exit(1);
   }
+};
 
+const deployGraphQL = async (studioDirname) => {
   // deploy sanity studio
   console.log("Deploying Sanity GraphQL API...");
   try {
     const proc = await execa("sanity", ["graphql", "deploy"], {
       cwd: studioDirname,
       env: {
-        SANITY_AUTH_TOKEN: process.env.SANITY_TOKEN, // re-map env var name
+        SANITY_AUTH_TOKEN: process.env.SANITY_DEPLOY_TOKEN,
       },
     });
     console.log(proc.stdout);
@@ -151,23 +128,22 @@ const deployGraphQL = async (dirname) => {
   }
 };
 
-const importSanityData = async (dirname, sanityContentPath, datasetName) => {
+const importSanityData = async (
+  studioDirname,
+  sanityContentPath,
+  datasetName
+) => {
   console.log("Importing Sanity documents...");
 
-  const studioDirname = path.resolve(dirname);
+  const contentPath = path.resolve(process.cwd(), sanityContentPath);
   try {
     const proc = await execa(
       "sanity",
-      [
-        "dataset",
-        "import",
-        path.resolve(process.cwd(), sanityContentPath),
-        `${datasetName}`,
-      ],
+      ["dataset", "import", contentPath, datasetName],
       {
         cwd: studioDirname,
         env: {
-          SANITY_AUTH_TOKEN: "", // re-map env var name
+          SANITY_AUTH_TOKEN: process.env.SANITY_TOKEN,
         },
       }
     );
@@ -184,14 +160,27 @@ if (env !== "production" && !isCloud) {
   const questions = [
     {
       name: "token",
-      message: "Sanity API Token",
+      message: "Sanity API Token (Editor)",
       when: !args.token && !process.env.SANITY_TOKEN,
       default: process.env.SANITY_TOKEN,
     },
     {
+      name: "deployToken",
+      message: "Sanity API Token (Deploy Studio)",
+      when: !args.deployToken && !process.env.SANITY_DEPLOY_TOKEN,
+      default: process.env.SANITY_DEPLOY_TOKEN,
+    },
+    {
+      name: "projectId",
+      message: "Sanity Project ID",
+      when: !args.projectId && !process.env.SANITY_PROJECT_ID,
+      default: process.env.SANITY_PROJECT_ID,
+    },
+    {
       name: "displayName",
       message: "Project Name",
-      when: !args.name,
+      when: !args.name && !process.env.SANITY_PROJECT_NAME,
+      default: process.env.SANITY_PROJECT_NAME,
     },
     {
       name: "dataset",
