@@ -15,3 +15,7 @@ In order to use this script in Gatsby Cloud, all environment variables must be p
 ## Local usage
 
 When running this locally, you will be prompted for environment variables if they are not found on the current process. Additionally, the script will update an `.env` file with the environment variables provided if one exists in the project already.
+
+## Limitations
+
+As of 5/26/22, this script depends upon a Sanity project having already been created with `sanity init` as well as a pair of tokens with Editor and Deploy permissions, respectively.
