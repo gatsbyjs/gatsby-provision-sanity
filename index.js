@@ -19,12 +19,20 @@ const isCloud = process.env.GATSBY_CLOUD === "true";
 
 yargs(hideBin(process.argv)).check((_, opts) => {
   const sanityStudioPath = opts.sanityStudioPath;
+  const sanityProjectId = opts.sanityProjectId;
+  const sanityDataset = opts.dataset;
   // const sanityContentPath = opts.sanityContentPath;
-  if (sanityStudioPath) return true;
+  if (sanityStudioPath && sanityProjectId && sanityDataset) return true;
   if (!sanityStudioPath) {
     throw new Error(
       "--sanity-studio-path is required — this should be path to the Sanity Studio directory"
     );
+  }
+  if (!sanityProjectId) {
+    throw new Error("--sanity-project-id is required");
+  }
+  if (!sanityDataset) {
+    throw new Error("--sanity-dataset is required");
   }
   // if (!sanityContentPath) {
   //   throw new Error(
@@ -37,7 +45,9 @@ const createProject = async (opts = {}) => {
   const token = process.env.SANITY_TOKEN;
   const sanityStudioPath = args.sanityStudioPath;
   const sanityContentPath = args.sanityContentPath;
-  let config, client, configFile;
+  const sanityProjectId = args.sanityProjectId;
+  const sanityDataset = args.dataset;
+  let config, client;
 
   try {
     config = require(path.resolve(
@@ -66,40 +76,18 @@ const createProject = async (opts = {}) => {
 
   console.log("Creating new Sanity project");
 
-  let displayName =
-    process.env.SANITY_PROJECT_NAME || opts.displayName || config.project?.name;
+  let projectId =
+    process.env.SANITY_PROJECT_ID || sanityProjectId || config.api?.projectId;
   let datasetName =
-    process.env.SANITY_DATASET || opts.dataset || config.api?.dataset; // TODO: could be SANITY_PROJECT_DATASET
+    process.env.SANITY_DATASET || sanityDataset || config.api?.dataset; // TODO: could be SANITY_PROJECT_DATASET
   const envVars = [];
 
-  // handle the case where there isn't a project existing already
-  if (!displayName && !datasetName) {
-    displayName = "New Sanity Project";
-    datasetName = "production";
+  if (projectId !== config.api?.projectId) {
+    config.api.projectId = projectId;
+  }
 
-    try {
-      const project = await client.request({
-        method: "POST",
-        uri: "/projects",
-        body: {
-          displayName,
-        },
-      });
-
-      config.api.projectId = project.id;
-      envVars.push(`SANITY_PROJECT_ID="${project.id}"`);
-
-      const dataset = await client.request({
-        method: "PUT",
-        uri: `/projects/${project.id}/datasets/${datasetName}`,
-      });
-
-      config.api.dataset = dataset.datasetName;
-      envVars.push(`SANITY_DATASET="${dataset.datasetName}"`);
-    } catch (e) {
-      console.log(`Failed to create new Sanity project ${e}`);
-      process.exit(1);
-    }
+  if (datasetName !== config.api?.dataset) {
+    config.api.dataset = datasetName;
   }
 
   // Update the sanity.json file config as other things read from it later
