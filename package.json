@@ -1,6 +1,6 @@
 {
   "name": "gatsby-provision-sanity",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Package for provisioning Sanity data associated with a Gatsby site",
   "main": "index.js",
   "scripts": {
