@@ -136,10 +136,11 @@ const importSanityData = async (
   console.log("Importing Sanity documents...");
 
   const contentPath = path.resolve(process.cwd(), sanityContentPath);
+
   try {
     const proc = await execa(
       "sanity",
-      ["dataset", "import", contentPath, datasetName],
+      ["dataset", "import", contentPath, datasetName, "--missing"],
       {
         cwd: studioDirname,
         env: {
