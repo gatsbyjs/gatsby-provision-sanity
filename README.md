@@ -11,7 +11,7 @@ When included as a dependency, it can be used in two contexts — within Gatsby 
 There exists some prerequisites for this package to work, namely:
 
 - You will need to have created a Sanity account and project (likely with sanity-cli and the `sanity init` command)
-- You will need to have created two tokens for the Sanity project — one with an Editor role and one with a Deploy role
+- You will need to have created two tokens for the Sanity project — one with an Editor role and one with a Deploy role, passed as environment variables under the keys `SANITY_EDITOR_TOKEN` and `SANITY_DEPLOY_TOKEN` respectively
 - The repository you include this package as a dependency for contains a Sanity Studio instance with a tarball of the content associated with the project that was created with the `sanity dataset export` command
 - The `sanity.json` file in Sanity Studio directory contains a value for `project.studioHostname`
 

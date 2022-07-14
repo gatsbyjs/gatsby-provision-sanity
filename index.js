@@ -33,9 +33,12 @@ yargs(hideBin(process.argv)).check((_, opts) => {
 const createProject = async (opts = {}) => {
   const sanityStudioPath = args.sanityStudioPath;
   const sanityContentPath = args.sanityContentPath;
-  const sanityProjectId = args.projectId;
-  const sanityProjectName = args.name;
-  const sanityDataset = args.dataset;
+  const sanityProjectId = args.projectId || opts.projectId;
+  const sanityProjectName = args.displayName || opts.displayName;
+  const sanityDataset = args.dataset || opts.dataset;
+  const sanityDeployToken = opts.deployToken;
+  const sanityEditorToken = opts.token;
+
   let config;
 
   try {
@@ -90,9 +93,14 @@ const createProject = async (opts = {}) => {
   // install deps
   await installStudioDependencies(studioDirname);
   // deploy graphql API
-  await deployGraphQL(studioDirname);
+  await deployGraphQL(studioDirname, sanityDeployToken);
   // import sanity data
-  await importSanityData(studioDirname, sanityContentPath, datasetName);
+  await importSanityData(
+    studioDirname,
+    sanityContentPath,
+    datasetName,
+    sanityEditorToken
+  );
 
   console.info("Sanity project successfully provisioned and deployed");
 };
@@ -101,29 +109,31 @@ const installStudioDependencies = async (studioDirname) => {
   // install needed Sanity Studio dependencies
   console.info("Installing Sanity Studio dependencies...");
   try {
-    await execa("npm", ["install"], {
+    const proc = await execa("npm", ["install"], {
       cwd: studioDirname,
-    }).stdout.pipe(process.stdout);
+    });
+    console.log(proc.stdout);
   } catch (e) {
     console.error(`Failed to install studio dependencies: ${e}`);
     process.exit(1);
   }
 };
 
-const deployGraphQL = async (studioDirname) => {
+const deployGraphQL = async (studioDirname, sanityDeployToken) => {
   // deploy sanity studio
   console.info("Deploying Sanity GraphQL API...");
-  if (!process.env.SANITY_DEPLOY_TOKEN) {
+  if (!process.env.SANITY_DEPLOY_TOKEN && !sanityDeployToken) {
     console.error("Missing required env var: SANITY_DEPLOY_TOKEN");
     process.exit(1);
   }
   try {
-    await execa("sanity", ["graphql", "deploy"], {
+    const proc = await execa("sanity", ["graphql", "deploy"], {
       cwd: studioDirname,
       env: {
-        SANITY_AUTH_TOKEN: process.env.SANITY_DEPLOY_TOKEN,
+        SANITY_AUTH_TOKEN: process.env.SANITY_DEPLOY_TOKEN || sanityDeployToken,
       },
-    }).stdout.pipe(process.stdout);
+    });
+    console.log(proc.stdout);
   } catch (e) {
     console.error(`Failed to deploy Sanity GraphQL API: ${e}`);
     process.exit(1);
@@ -133,12 +143,13 @@ const deployGraphQL = async (studioDirname) => {
 const importSanityData = async (
   studioDirname,
   sanityContentPath,
-  datasetName
+  datasetName,
+  sanityEditorToken
 ) => {
   console.info("Importing Sanity documents...");
 
-  if (!process.env.SANITY_TOKEN) {
-    console.error("Missing required env var: SANITY_TOKEN");
+  if (!process.env.SANITY_EDITOR_TOKEN && !sanityEditorToken) {
+    console.error("Missing required env var: SANITY_EDITOR_TOKEN");
     process.exit(1);
   }
 
@@ -151,60 +162,64 @@ const importSanityData = async (
       {
         cwd: studioDirname,
         env: {
-          SANITY_AUTH_TOKEN: process.env.SANITY_TOKEN,
+          SANITY_AUTH_TOKEN:
+            process.env.SANITY_EDITOR_TOKEN || sanityEditorToken,
         },
       }
     );
     console.log(proc.stdout);
   } catch (e) {
-    console.log(`Failed to import Sanity documents: ${e}`);
+    console.error(`Failed to import Sanity documents: ${e}`);
     process.exit(1);
   }
 };
 
-// Show prompt in local dev
-if (env !== "production" && !isCloud) {
-  const inquirer = require("inquirer");
-  const questions = [
-    {
-      name: "token",
-      message: "Sanity API Token (Editor)",
-      when: !args.token && !process.env.SANITY_TOKEN,
-      default: process.env.SANITY_TOKEN,
-    },
-    {
-      name: "deployToken",
-      message: "Sanity API Token (Deploy Studio)",
-      when: !args.deployToken && !process.env.SANITY_DEPLOY_TOKEN,
-      default: process.env.SANITY_DEPLOY_TOKEN,
-    },
-    {
-      name: "projectId",
-      message: "Sanity Project ID",
-      when: !args.projectId && !process.env.SANITY_PROJECT_ID,
-      default: process.env.SANITY_PROJECT_ID,
-    },
-    {
-      name: "displayName",
-      message: "Project Name",
-      when: !args.name && !process.env.SANITY_PROJECT_NAME,
-      default: process.env.SANITY_PROJECT_NAME,
-    },
-    {
-      name: "dataset",
-      message: "Dataset Name",
-      default: "production",
-      when: !args.dataset && !process.env.SANITY_DATASET,
-      default: process.env.SANITY_DATASET,
-    },
-  ];
-  inquirer
-    .prompt(questions)
-    .then((res) => {
-      console.log("inquirer response: ", res);
-      createProject(res);
-    })
-    .catch((err) => console.error(err));
-} else {
-  createProject(args);
+function main() {
+  // Show prompt in local dev
+  if (env !== "production" && !isCloud) {
+    const inquirer = require("inquirer");
+    const questions = [
+      {
+        name: "token",
+        message: "Sanity API Token (Editor)",
+        when: !args.token && !process.env.SANITY_EDITOR_TOKEN,
+        default: process.env.SANITY_EDITOR_TOKEN,
+      },
+      {
+        name: "deployToken",
+        message: "Sanity API Token (Deploy Studio)",
+        when: !args.deployToken && !process.env.SANITY_DEPLOY_TOKEN,
+        default: process.env.SANITY_DEPLOY_TOKEN,
+      },
+      {
+        name: "projectId",
+        message: "Sanity Project ID",
+        when: !args.projectId && !process.env.SANITY_PROJECT_ID,
+        default: process.env.SANITY_PROJECT_ID,
+      },
+      {
+        name: "displayName",
+        message: "Project Name",
+        when: !args.name && !process.env.SANITY_PROJECT_NAME,
+        default: process.env.SANITY_PROJECT_NAME,
+      },
+      {
+        name: "dataset",
+        message: "Dataset Name",
+        default: "production",
+        when: !args.dataset && !process.env.SANITY_DATASET,
+        default: process.env.SANITY_DATASET,
+      },
+    ];
+    inquirer
+      .prompt(questions)
+      .then((res) => {
+        return createProject(res);
+      })
+      .catch((err) => console.error(err));
+  } else {
+    return createProject(args);
+  }
 }
+
+main();
