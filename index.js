@@ -45,19 +45,19 @@ const createProject = async (opts = {}) => {
       "sanity.json"
     ));
   } catch (e) {
-    console.log(`Failed to get sanity.json config in ${sanityStudioPath}`);
+    console.error(`Failed to get sanity.json config in ${sanityStudioPath}`);
     process.exit(1);
   }
 
   config.api = config.api || {};
 
-  console.log("Creating new Sanity project");
+  console.info("Creating new Sanity project");
 
   let projectId =
     process.env.SANITY_PROJECT_ID || sanityProjectId || config.api?.projectId;
   let displayName = sanityProjectName || config.project?.name;
   let datasetName =
-    process.env.SANITY_DATASET || sanityDataset || config.api?.dataset; // TODO: could be SANITY_PROJECT_DATASET
+    process.env.SANITY_PROJECT_DATASET || sanityDataset || config.api?.dataset;
   const envVars = [];
 
   if (projectId !== config.api?.projectId) {
@@ -73,7 +73,7 @@ const createProject = async (opts = {}) => {
   }
 
   // Update the sanity.json file config as other things read from it later
-  console.log("Updating sanity.json");
+  console.info("Updating sanity.json");
   fs.outputJson(path.resolve(`${sanityStudioPath}`, "sanity.json"), config, {
     spaces: 2,
   });
@@ -94,36 +94,38 @@ const createProject = async (opts = {}) => {
   // import sanity data
   await importSanityData(studioDirname, sanityContentPath, datasetName);
 
-  console.log("Sanity project successfully provisioned and deployed");
+  console.info("Sanity project successfully provisioned and deployed");
 };
 
 const installStudioDependencies = async (studioDirname) => {
   // install needed Sanity Studio dependencies
-  console.log("Installing Sanity Studio dependencies...");
+  console.info("Installing Sanity Studio dependencies...");
   try {
-    const proc = await execa("npm", ["install"], {
+    await execa("npm", ["install"], {
       cwd: studioDirname,
-    });
-    console.log(proc.stdout);
+    }).stdout.pipe(process.stdout);
   } catch (e) {
-    console.log(`Failed to install studio dependencies: ${e}`);
+    console.error(`Failed to install studio dependencies: ${e}`);
     process.exit(1);
   }
 };
 
 const deployGraphQL = async (studioDirname) => {
   // deploy sanity studio
-  console.log("Deploying Sanity GraphQL API...");
+  console.info("Deploying Sanity GraphQL API...");
+  if (!process.env.SANITY_DEPLOY_TOKEN) {
+    console.error("Missing required env var: SANITY_DEPLOY_TOKEN");
+    process.exit(1);
+  }
   try {
-    const proc = await execa("sanity", ["graphql", "deploy"], {
+    await execa("sanity", ["graphql", "deploy"], {
       cwd: studioDirname,
       env: {
         SANITY_AUTH_TOKEN: process.env.SANITY_DEPLOY_TOKEN,
       },
-    });
-    console.log(proc.stdout);
+    }).stdout.pipe(process.stdout);
   } catch (e) {
-    console.log(`Failed to deploy Sanity GraphQL API: ${e}`);
+    console.error(`Failed to deploy Sanity GraphQL API: ${e}`);
     process.exit(1);
   }
 };
@@ -133,7 +135,12 @@ const importSanityData = async (
   sanityContentPath,
   datasetName
 ) => {
-  console.log("Importing Sanity documents...");
+  console.info("Importing Sanity documents...");
+
+  if (!process.env.SANITY_TOKEN) {
+    console.error("Missing required env var: SANITY_TOKEN");
+    process.exit(1);
+  }
 
   const contentPath = path.resolve(process.cwd(), sanityContentPath);
 
